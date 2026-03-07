@@ -1,108 +1,104 @@
-# Product Research Skill
+# AI Skills
 
-An Agent Skill that helps you find the best products by analysing independent editorial reviews — cutting through affiliate spam, retailer reviews, and AI-generated listicles to find recommendations backed by genuine hands-on testing.
+A collection of Agent Skills for Claude and compatible AI tools, using the open [Agent Skills](https://agentskills.io) SKILL.md standard.
 
-## What it does
+## Skills
 
-Give it a product category and your requirements, and it will:
-
-1. **Search** for high-quality editorial review sources (Wirecutter, Outdoor Gear Lab, Consumer Reports, RTINGS, Switchback Travel, GearJunkie, and dozens more)
-2. **Read** the full articles, not just snippets
-3. **Cross-reference** products across multiple independent sources
-4. **Synthesise** findings into clear recommendations with source-by-source evidence
-5. **Show its work** — every recommendation links back to the review that supports it, and excluded sources are listed with reasons
-
-## Example prompts
-
-- "What's the best laptop for software development under £1500?"
-- "Best kids ski goggles for a 5 year old"
-- "Help me choose running shoes for trail running in wet conditions"
-- "What's the best robot vacuum? I have pets and hardwood floors"
-- "Recommend underwear — I run hot and want something breathable"
-
-## Output format
-
-For each query you get:
-
-- **Research summary** — what was searched, how many sources consulted, coverage landscape
-- **Top recommendations** (2–4 picks) differentiated by use case, each with:
-  - Source-by-source review evidence with attribution and links
-  - Consensus summary showing where reviewers agree/disagree
-  - Key strengths, watch-outs, and price range
-- **Key tradeoffs** — what you gain and lose with each choice
-- **Sources consulted** — full list with methodology notes
-- **Sources excluded** — transparency on what was skipped and why
-
-## Source quality tiers
-
-The skill prioritises sources in three tiers:
-
-| Tier | Sources | Why |
-|------|---------|-----|
-| **Tier 1 — Gold standard** | Wirecutter, Outdoor Gear Lab, Consumer Reports, RTINGS, Tom's Hardware/Guide | Rigorous methodology, buy their own products, extensive hands-on testing |
-| **Tier 2 — Strong editorial** | GearJunkie, Switchback Travel, The Verge, Ars Technica, Serious Eats, Which?, Good Housekeeping Institute, and more | Trustworthy editorial teams with transparent testing processes |
-| **Tier 3 — Use with caution** | Specialist blogs with demonstrated expertise | Noted as single-source when used |
-
-**Always excluded:** Amazon/retailer reviews, brand websites, affiliate listicles without hands-on testing, AI-generated roundups.
+| Skill | Description |
+|-------|-------------|
+| [product-research](./product-research) | Find the best products by analysing independent editorial reviews |
 
 ## Installation
 
 ### Claude.ai
 
-1. Download the `product-research.skill` file from [Releases](../../releases)
-2. Go to **Settings → Capabilities → Skills → Add → Upload a skill**
-3. Upload the `.skill` file
+Download the `.skill` file for the skill you want from its directory (e.g. `product-research/product-research.skill`), then go to **Settings → Capabilities → Skills → Add → Upload a skill** and upload it.
 
-Or create the skill manually:
+Or install any skill directly without building:
 1. Go to **Settings → Capabilities → Skills → Add → Write skill instructions**
-2. Copy the contents of `product-research/SKILL.md` into the skill editor
+2. Copy the contents of `<skill-name>/SKILL.md` into the skill editor
 
 ### Claude Code
 
 ```bash
-# Clone into your personal skills directory
-git clone https://github.com/YOUR_USERNAME/product-research-skill.git ~/.claude/skills/product-research
+# Clone the whole repo into your personal skills directory
+git clone https://github.com/YOUR_USERNAME/ai-skills.git ~/.claude/skills
 
 # Or for a specific project
-git clone https://github.com/YOUR_USERNAME/product-research-skill.git .claude/skills/product-research
+git clone https://github.com/YOUR_USERNAME/ai-skills.git .claude/skills
 ```
 
 ### Other compatible tools
 
-This skill uses the open [Agent Skills](https://agentskills.io) SKILL.md standard and should work with any compatible tool including Codex CLI, Gemini CLI, Cursor, and others.
+All skills use the open [Agent Skills](https://agentskills.io) SKILL.md standard and are compatible with Codex CLI, Gemini CLI, Cursor, and other supporting tools.
 
-## How it works
+## Authoring a new skill
 
-The skill instructs Claude to:
+1. **Create a directory** for your skill:
+   ```bash
+   mkdir my-skill
+   ```
 
-1. **Ask clarifying questions** if the query is too broad (e.g., "best laptop" → "what's your primary use case and budget?")
-2. **Run multiple targeted searches** using patterns like `best [product] [year] site:wirecutter.com`
-3. **Fetch and read full review articles** — not just search snippets
-4. **Track products across sources** — building a cross-reference map of which products appear where and what each source says
-5. **Synthesise with transparency** — every claim links back to its source, and disagreements between reviewers are surfaced
+2. **Write the skill definition** in `my-skill/SKILL.md` with frontmatter:
+   ```markdown
+   ---
+   name: my-skill
+   description: >
+     Describe when to trigger this skill. The AI uses this to decide when
+     to activate it, so be specific about trigger phrases and use cases.
+   ---
 
-## Design decisions
+   # My Skill
 
-- **No retailer reviews, ever.** Amazon reviews, John Lewis, Argos, etc. are explicitly excluded. Retailer reviews mix genuine feedback with incentivised reviews and don't involve comparative testing.
-- **Recency matters.** The skill flags when the most recent review is over 18 months old.
-- **Honesty about gaps.** If independent reviews are scarce for a category, the skill says so rather than padding with low-quality sources.
-- **UK-aware.** Notes UK availability and pricing where relevant (configurable based on user location).
-- **Copyright-respecting.** Direct quotes are kept under 15 words with full attribution. The skill paraphrases and links rather than reproducing review content.
+   Your skill instructions here...
+   ```
 
-## Limitations
+3. **Document it** in `my-skill/README.md` covering what it does, example prompts, and any limitations.
 
-- Depends on web search access — works in Claude.ai (with web search enabled), Claude Code, and API with tools
-- Quality of output depends on the review landscape for the category — well-reviewed categories (electronics, outdoor gear) produce richer results than niche products
-- Cannot access paywalled content (e.g., some Consumer Reports articles)
-- Not designed for price comparison, deal-finding, or price tracking — this is about finding the *best product*, not the *best price*
+4. **Build it**:
+   ```bash
+   make my-skill
+   # outputs dist/my-skill.skill
+   ```
+
+5. **Add it to the table** in this README.
+
+## Building
+
+```bash
+make          # build all skills
+make <name>   # build a single skill (e.g. make product-research)
+make clean    # remove built artifacts
+```
+
+Built `.skill` files are written into each skill's directory (e.g. `product-research/product-research.skill`) and committed to the repo so they can be downloaded and shared directly.
+
+## SKILL.md format
+
+Each skill requires a `SKILL.md` file with a YAML frontmatter block followed by the skill instructions in Markdown:
+
+```markdown
+---
+name: skill-name
+description: >
+  Natural language description of when to trigger this skill. Include
+  specific trigger phrases and use cases. Also describe what NOT to use
+  it for to reduce false positives.
+---
+
+# Skill Name
+
+The instructions Claude will follow when this skill is active...
+```
+
+See any existing skill's `SKILL.md` for a complete example.
 
 ## Contributing
 
-Suggestions for improving the skill are welcome! Key areas:
+Contributions of new skills or improvements to existing ones are welcome. Please open a PR with:
 
-- **Additional trusted review sources** for specific categories (especially non-English-language markets)
-- **Category-specific search strategies** that work better than the general patterns
-- **Output format improvements** based on your experience using the skill
+- A new skill directory following the structure above, or
+- Improvements to an existing skill's `SKILL.md` or `README.md`
 
 ## License
 
