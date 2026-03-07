@@ -49,13 +49,7 @@ The skill prioritises sources in three tiers:
 
 ### Claude.ai
 
-Build and upload the skill:
-
-```bash
-make product-research
-```
-
-Then go to **Settings → Capabilities → Skills → Add → Upload a skill** and upload `dist/product-research.skill`.
+Download [`product-research.skill`](./product-research.skill) from this directory, then go to **Settings → Capabilities → Skills → Add → Upload a skill** and upload it.
 
 Or install directly:
 1. Go to **Settings → Capabilities → Skills → Add → Write skill instructions**

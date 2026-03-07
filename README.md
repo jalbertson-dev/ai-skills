@@ -12,14 +12,7 @@ A collection of Agent Skills for Claude and compatible AI tools, using the open 
 
 ### Claude.ai
 
-Build the `.skill` file for the skill you want:
-
-```bash
-make <skill-name>
-# e.g. make product-research
-```
-
-Then go to **Settings → Capabilities → Skills → Add → Upload a skill** and upload `dist/<skill-name>.skill`.
+Download the `.skill` file for the skill you want from its directory (e.g. `product-research/product-research.skill`), then go to **Settings → Capabilities → Skills → Add → Upload a skill** and upload it.
 
 Or install any skill directly without building:
 1. Go to **Settings → Capabilities → Skills → Add → Write skill instructions**
@@ -78,7 +71,7 @@ make <name>   # build a single skill (e.g. make product-research)
 make clean    # remove built artifacts
 ```
 
-Built `.skill` files are written to `dist/` and are excluded from version control.
+Built `.skill` files are written into each skill's directory (e.g. `product-research/product-research.skill`) and committed to the repo so they can be downloaded and shared directly.
 
 ## SKILL.md format
 

@@ -1,5 +1,3 @@
-DIST_DIR := dist
-
 # Discover all skills by finding directories containing a SKILL.md
 SKILLS := $(patsubst %/SKILL.md,%,$(wildcard */SKILL.md))
 
@@ -9,15 +7,17 @@ SKILLS := $(patsubst %/SKILL.md,%,$(wildcard */SKILL.md))
 all: $(SKILLS)
 
 ## Build a single skill: make <skill-name>
+## Output is <skill-name>/<skill-name>.skill (committed to the repo for distribution)
 $(SKILLS):
-	@mkdir -p $(DIST_DIR)
 	@echo "Building $@.skill..."
-	@cd $@ && zip -j ../$(DIST_DIR)/$@.skill SKILL.md
-	@echo "  → $(DIST_DIR)/$@.skill"
+	@cd $@ && zip -j $@.skill SKILL.md
+	@echo "  → $@/$@.skill"
 
-## Remove all built artifacts
+## Remove all built .skill artifacts
 clean:
-	rm -rf $(DIST_DIR)
+	@for s in $(SKILLS); do \
+		rm -f $$s/$$s.skill && echo "  removed $$s/$$s.skill"; \
+	done
 
 ## List available skills
 list:
