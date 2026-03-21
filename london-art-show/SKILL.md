@@ -99,8 +99,17 @@ Search for images from the exhibition:
 - `[exhibition name] installation view`
 - `[exhibition name] [venue] images`
 - `[exhibition name] works on display`
+- `[exhibition name] [artist name] painting` (or sculpture, photograph, etc.)
 
-Note any standout works or "must-see" pieces highlighted across multiple reviews. Where image links are available from reputable sources (gallery website, newspaper reviews), include them.
+Note any standout works or "must-see" pieces highlighted across multiple reviews.
+
+**Finding image URLs:** When you fetch review articles and the gallery's own exhibition page, look for direct image URLs (ending in `.jpg`, `.png`, `.webp`, or hosted on image CDNs) embedded in the page content. Gallery websites, newspaper reviews, and arts publications almost always include high-resolution images of key works and installation views. Extract these URLs so you can display them inline in the output.
+
+**Priority sources for images:**
+1. The gallery/venue's own exhibition page (usually has installation views and key works)
+2. Newspaper review articles (The Guardian, FT, Telegraph — all embed images of exhibited works)
+3. The Art Newspaper, Apollo, Frieze — arts publications with high-quality photography
+4. Artist or estate official websites
 
 ### Step 5: Determine the type of art and thematic summary
 
@@ -167,11 +176,24 @@ List any preview articles, curator interviews, or feature pieces found:
 
 ### 6. Images and standout works
 
-List key works highlighted across reviews as "must-see" pieces:
+**CRITICAL: Display images inline using markdown image syntax.** This section must be visual — the user should see the art, not just read about it.
 
-- **[Work title]** ([date]) — [Brief description and why it's highlighted]
+For each key work or installation view where you found an image URL, render it inline:
 
-Include links to any installation views or images of key works from reputable sources (gallery website, newspaper photography).
+![Brief description of the work](https://example.com/image-url.jpg)
+*[Work title]* ([date]) by [Artist] — [Brief description and why it's highlighted]
+Source: [Publication or gallery name]
+
+---
+
+Aim to include **at least 3-5 inline images** covering:
+- 1-2 installation views showing the exhibition layout
+- 2-3 individual key works highlighted across reviews as "must-see" pieces
+
+If you cannot find direct image URLs for a work, still list it as a must-see with a text description and link to the review/page where the image can be viewed:
+- **[Work title]** ([date]) — [Brief description] — [See image at: link]
+
+**Important:** Only use image URLs from reputable sources (gallery websites, major newspaper reviews, arts publications). Do not guess or fabricate image URLs. If a URL doesn't look like a direct image link, link to the page instead.
 
 ### 7. Visitor tips
 
@@ -192,3 +214,4 @@ If reviews or previews mention practical advice, include it:
 - **Attribute everything.** Every claim about the show's quality should be traceable to a specific review or source.
 - **UK-specific context.** Assume London-based user — use UK pricing, UK publications, and note any relevant membership schemes (Art Fund, National Art Pass, gallery membership, Tate Collective for under-25s, etc.).
 - **Don't recommend sight-unseen.** Your role is to aggregate and present critical opinion, not to give your own review. Let the reviews speak for themselves.
+- **Images are essential.** The output must be visual. Always extract and display inline images using markdown `![alt](url)` syntax. An output without images is incomplete — go back and fetch gallery/review pages to find image URLs if your first pass didn't surface any.
