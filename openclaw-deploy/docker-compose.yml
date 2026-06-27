@@ -1,0 +1,49 @@
+# Reference Docker Compose for running OpenClaw on a single VPS.
+#
+# This mirrors the service layout the official `scripts/docker/setup.sh` produces
+# (a long-running `openclaw-gateway` plus a one-shot `openclaw-cli` for admin
+# tasks like channel pairing). If you'd rather let OpenClaw generate everything,
+# run the official setup script instead and treat this file as documentation.
+#
+# The gateway binds to 127.0.0.1 ONLY. It is never published to the public
+# internet directly — reach the Control UI over Tailscale or an SSH tunnel, or
+# put Caddy (see Caddyfile) in front of it for public TLS + auth.
+
+services:
+  openclaw-gateway:
+    image: ${OPENCLAW_IMAGE:-ghcr.io/openclaw/openclaw:latest}
+    container_name: openclaw-gateway
+    restart: unless-stopped
+    command: ["gateway", "--port", "18789"]
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?set ANTHROPIC_API_KEY in .env}
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:?set OPENCLAW_GATEWAY_TOKEN in .env}
+      OPENCLAW_MODEL_PRIMARY: ${OPENCLAW_MODEL_PRIMARY:-anthropic/claude-opus-4-8}
+      OPENCLAW_SANDBOX: ${OPENCLAW_SANDBOX:-1}
+    ports:
+      # Bound to loopback on purpose. Do NOT change to 0.0.0.0 without a proxy.
+      - "127.0.0.1:18789:18789"
+    volumes:
+      - ${OPENCLAW_CONFIG_DIR:-/opt/openclaw/config}:/home/node/.openclaw
+      - ${OPENCLAW_WORKSPACE_DIR:-/opt/openclaw/workspace}:/home/node/.openclaw/workspace
+      - ${OPENCLAW_AUTH_PROFILE_SECRET_DIR:-/opt/openclaw/auth}:/home/node/.config/openclaw
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:18789/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  # One-shot helper for admin commands, e.g. pairing a channel:
+  #   docker compose run --rm openclaw-cli channels login          # WhatsApp QR
+  #   docker compose run --rm openclaw-cli channels add --channel telegram --token "<token>"
+  openclaw-cli:
+    image: ${OPENCLAW_IMAGE:-ghcr.io/openclaw/openclaw:latest}
+    profiles: ["cli"]
+    environment:
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:?set OPENCLAW_GATEWAY_TOKEN in .env}
+    volumes:
+      - ${OPENCLAW_CONFIG_DIR:-/opt/openclaw/config}:/home/node/.openclaw
+      - ${OPENCLAW_WORKSPACE_DIR:-/opt/openclaw/workspace}:/home/node/.openclaw/workspace
+      - ${OPENCLAW_AUTH_PROFILE_SECRET_DIR:-/opt/openclaw/auth}:/home/node/.config/openclaw
+    entrypoint: ["openclaw"]
