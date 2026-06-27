@@ -83,12 +83,30 @@ If a channel won't connect, check what got blocked and add its domain:
 docker compose logs openclaw-egress-proxy
 ```
 
-**Caveat:** this filters traffic that honors `HTTP(S)_PROXY` (OpenClaw/Node does).
-It is a strong application-level control, not an airtight network jail — code that
-deliberately dials raw IPs would bypass it, which is exactly why the **sandbox +
-tool allowlist** (Tier 1) must also be on so such code can't run in the first
-place. For an airtight version, also apply a host-level default-deny outbound
-firewall allowing only the proxy, Tailscale, and DNS (advanced; tune per channel).
+**How airtight it is — two layers:**
+
+1. **Network isolation (default in the overlay).** The gateway runs on an
+   `internal: true` Docker network with *no route to the internet*; its only path
+   out is the proxy. So you can't bypass the allowlist by dialing raw IPs —
+   there's no route to dial. This closes the "Node honors `HTTP_PROXY` but raw
+   sockets wouldn't" gap.
+2. **Kernel backstop (optional, recommended).** Run `egress/firewall.sh enable`
+   to add `DOCKER-USER` iptables rules that DROP any forwarded traffic from the
+   gateway subnet to the public internet (replies and private ranges still flow,
+   so gateway → proxy works). This holds even if the internal network is ever
+   misconfigured. It only touches container-forwarded traffic — **it cannot lock
+   you out of SSH or the host.** Rules aren't persistent across reboot; use
+   `netfilter-persistent save` or re-run on boot to keep them.
+
+```bash
+sudo ./egress/firewall.sh enable    # add the kernel backstop
+sudo ./egress/firewall.sh status    # inspect
+sudo ./egress/firewall.sh disable   # roll back
+```
+
+Together (domain-filtered proxy + no-route isolation + kernel DROP) egress is
+effectively airtight. The sandbox + tool allowlist still matter as the layer that
+stops malicious code from running at all.
 
 ---
 

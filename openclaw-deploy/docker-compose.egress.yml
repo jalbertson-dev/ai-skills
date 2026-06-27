@@ -1,24 +1,36 @@
-# Optional egress-hardening overlay (Tier-1 control — see SECURITY.md).
+# Egress-hardening overlay (Tier-1 control — see SECURITY.md).
 #
-# Adds a default-deny filtering proxy and forces the gateway's outbound HTTP/S
-# through it, so a prompt-injected agent can only reach allowlisted domains and
-# every attempt is logged. Layer it on top of the base compose:
+# Airtight egress: the gateway sits on an INTERNAL Docker network with no route
+# to the internet, and its only way out is the Squid proxy (which bridges to the
+# internet on a second network). So outbound is both (a) domain-filtered by the
+# proxy allowlist and (b) impossible to bypass by dialing raw IPs — there is no
+# route. Layer it on top of the base compose:
 #
 #   docker compose -f docker-compose.yml -f docker-compose.egress.yml up -d
 #
-# After enabling, confirm your channels still connect; if one fails, find the
-# blocked domain in the proxy logs and add it to egress/squid.conf:
-#   docker compose logs openclaw-egress-proxy
+# If a channel won't connect, find the blocked domain and add it to
+# egress/squid.conf:   docker compose logs openclaw-egress-proxy
 #
-# NOTE: this filters traffic that honors HTTP(S)_PROXY (OpenClaw/Node does). It's
-# a strong application-level control, not an airtight network jail — which is why
-# the sandbox + tool allowlist must also be on. See SECURITY.md "Egress hardening".
+# After enabling, confirm you can still reach the Control UI over Tailscale (the
+# published 127.0.0.1:18789 port keeps working on an internal network). For a
+# kernel-level backstop, also run egress/firewall.sh (see SECURITY.md).
+
+networks:
+  # No NAT / no default route to the outside world.
+  egress_internal:
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.31.250.0/24
+  # Normal bridged network the proxy uses to reach the internet.
+  egress_external: {}
 
 services:
   egress-proxy:
     image: ubuntu/squid:latest
     container_name: openclaw-egress-proxy
     restart: unless-stopped
+    networks: [egress_internal, egress_external]
     volumes:
       - ./egress/squid.conf:/etc/squid/squid.conf:ro
     logging:
@@ -28,6 +40,8 @@ services:
         max-file: "3"
 
   openclaw-gateway:
+    # Only the internal network -> no direct internet; must use the proxy.
+    networks: [egress_internal]
     depends_on:
       - egress-proxy
     environment:
