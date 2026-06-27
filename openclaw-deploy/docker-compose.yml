@@ -1,13 +1,21 @@
-# Reference Docker Compose for running OpenClaw on a single VPS.
+# Docker Compose for running OpenClaw on a single VPS — low-maintenance edition.
 #
-# This mirrors the service layout the official `scripts/docker/setup.sh` produces
-# (a long-running `openclaw-gateway` plus a one-shot `openclaw-cli` for admin
-# tasks like channel pairing). If you'd rather let OpenClaw generate everything,
-# run the official setup script instead and treat this file as documentation.
+# Services:
+#   openclaw-gateway  long-running assistant; auto-restarts, healthchecked,
+#                     auto-updated by Watchtower, log-rotated.
+#   watchtower        watches the gateway image and updates it on a schedule,
+#                     pruning old images so the disk stays clean.
+#   openclaw-cli      one-shot helper for admin tasks (channel pairing, etc.).
 #
 # The gateway binds to 127.0.0.1 ONLY. It is never published to the public
 # internet directly — reach the Control UI over Tailscale or an SSH tunnel, or
 # put Caddy (see Caddyfile) in front of it for public TLS + auth.
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
 
 services:
   openclaw-gateway:
@@ -15,6 +23,10 @@ services:
     container_name: openclaw-gateway
     restart: unless-stopped
     command: ["gateway", "--port", "18789"]
+    logging: *default-logging
+    labels:
+      # Opt this container in to Watchtower auto-updates.
+      com.centurylinklabs.watchtower.enable: "true"
     environment:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?set ANTHROPIC_API_KEY in .env}
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:?set OPENCLAW_GATEWAY_TOKEN in .env}
@@ -33,6 +45,24 @@ services:
       timeout: 5s
       retries: 5
       start_period: 40s
+
+  # Auto-updates the gateway image so you don't run `compose pull` by hand.
+  # Only touches containers with the watchtower.enable=true label above.
+  # Default schedule: weekly, Sunday 04:00. Override WATCHTOWER_SCHEDULE in .env.
+  # To go fully manual instead, set WATCHTOWER_DISABLE=1 / don't start this service.
+  watchtower:
+    image: containrrr/watchtower
+    container_name: watchtower
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_LABEL_ENABLE: "true"
+      WATCHTOWER_ROLLING_RESTART: "true"
+      WATCHTOWER_SCHEDULE: ${WATCHTOWER_SCHEDULE:-0 0 4 * * 0}
+      WATCHTOWER_TIMEOUT: "60s"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
 
   # One-shot helper for admin commands, e.g. pairing a channel:
   #   docker compose run --rm openclaw-cli channels login          # WhatsApp QR

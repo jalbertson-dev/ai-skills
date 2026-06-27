@@ -1,13 +1,25 @@
-# Deploying OpenClaw to the cloud
+# Deploying OpenClaw to Hetzner Cloud (low-maintenance edition)
 
 A runbook for standing up [OpenClaw](https://github.com/openclaw/openclaw) — the
-self-hosted personal AI assistant gateway — on a single cloud VM. WhatsApp is
-**not** required to get going; this setup leaves the door open to add it (or any
-other channel) later with zero rearchitecting.
+self-hosted personal AI assistant — on a single Hetzner VPS, set up so it
+**runs itself**: security patches, reboots, image updates, backups, log
+rotation, and host-down alerting are all automated at provision time. WhatsApp
+is **not** required to get going and slots in later with no infra changes.
 
-> Defaults chosen here: **Hetzner VPS + Docker Compose**, with the Control UI
-> kept private via **Tailscale**. Both are easy to swap — see
-> [Alternatives](#alternatives).
+> UI access is kept private via **Tailscale** (nothing exposed to the public
+> internet). A Caddy public-TLS alternative is included if you prefer.
+
+---
+
+## Who does what
+
+| | |
+|---|---|
+| **Only you can do** (account, hardware, secrets) | Steps 1–4 below |
+| **Already done for you** (committed in this folder) | Hardened `setup.sh`, `docker-compose.yml` w/ auto-updates, maintenance scripts, systemd timers, this runbook |
+
+I can't provision the server, hold your API keys, or scan QR codes — those are
+inherently yours. Everything that *can* be codified already is.
 
 ---
 
@@ -15,128 +27,131 @@ other channel) later with zero rearchitecting.
 
 | Requirement | Detail |
 |---|---|
-| Runtime | Single always-on container, `ghcr.io/openclaw/openclaw:latest` |
-| Resources | ≥ 2 GB RAM (CX22's 4 GB is comfortable) |
-| Port | `18789` — the gateway / Control UI (keep it OFF the public internet) |
-| State | Persistent dirs for config, workspace, and auth profile |
-| Model | A provider key; docs default `model.primary` to an Anthropic Claude model |
-| WhatsApp (later) | Pairing scans a QR over `channels login` and stores a WhatsApp Web session on disk — this is why a box with SSH + a persistent volume is the easy path |
+| Runtime | One always-on container, `ghcr.io/openclaw/openclaw:latest` |
+| RAM | **4 GB** runs a text-only agent; **8 GB** if skills do browser automation |
+| Port | `18789` Control UI — kept on `127.0.0.1`, reached via Tailscale |
+| State | Persistent dirs for config, workspace, auth (WhatsApp session lives here) |
+| Model | An Anthropic API key (docs default `model.primary` to a Claude model) |
 
-Health endpoints (unauthenticated): `GET /healthz` (liveness), `GET /readyz` (readiness).
-
----
-
-## Why this layout
-
-- **VPS over PaaS** — OpenClaw is stateful and always-on, and adding WhatsApp
-  later means an interactive QR pairing plus a long-lived session on disk. A VM
-  with SSH and a real volume makes that trivial; ephemeral PaaS makes it fiddly.
-- **Hetzner CX22** — 2 vCPU / 4 GB / 40 GB for ~€4/mo is the best price/perf for
-  a single container of this size.
-- **Tailscale for the UI** — the Control UI on `18789` is sensitive. Keeping it
-  bound to `127.0.0.1` and reaching it over a private tailnet means **nothing is
-  publicly exposed**. (Caddy + TLS + basic auth is provided as an alternative.)
+Health endpoints: `GET /healthz` (liveness), `GET /readyz` (readiness).
 
 ---
 
-## Steps
+## Your manual steps (~20 minutes, one time)
 
-### 1. Provision
+### 1. Hetzner account + server
+- Sign up at [console.hetzner.cloud](https://console.hetzner.cloud), create a project.
+- **Create server:**
+  - Image: **Ubuntu 24.04**
+  - Type: **CX32** (4 vCPU / 8 GB) recommended so browser-automation skills work
+    later without resizing; **CX22** (2 vCPU / 4 GB) is fine for text-only.
+  - Location: pick a US (Ashburn/Hillsboro) or EU region near you.
+  - **SSH key: add yours at creation** ← important; it lets `setup.sh` lock down
+    SSH safely. (Without it, password login is left on so you aren't locked out.)
+  - **Backups: tick the "Backups" box** (automated offsite snapshots, ~20% surcharge).
+    This is your protection against total host loss — don't skip it.
 
-Create a Hetzner Cloud **CX22**, image **Ubuntu 24.04**, and add your SSH key.
-Pick a region near you (Ashburn/US or any EU site).
+### 2. Get an Anthropic API key
+From [console.anthropic.com](https://console.anthropic.com) → API Keys.
 
-### 2. Bootstrap the box
+### 3. (Recommended, free) Create monitors
+- **healthchecks.io** — make a check (period 5m, grace 5m), copy its ping URL.
+  This is your "tell me if the host dies" alert.
+- **Tailscale** account (free) if you don't have one — for private UI access.
 
-SSH in as `root` and run the provisioning script (creates a non-root user,
-firewall, Docker + Compose, Tailscale, and the state dirs):
+### 4. Bootstrap the box
+SSH in as `root` and run the provisioning script:
 
 ```bash
-# copy setup.sh up first, or paste it, then:
+ssh root@<server-ip>
+git clone https://github.com/jalbertson-dev/ai-skills.git
+cd ai-skills/openclaw-deploy
 bash setup.sh
-tailscale up        # join your tailnet
 ```
 
-### 3. Configure
-
-As the `openclaw` user, drop this directory's files on the server and create the
-env file:
+`setup.sh` creates the `openclaw` user, locks down SSH, sets up the firewall,
+Docker, Tailscale, auto-updates+reboot, log rotation, and the backup/heartbeat
+timers. Then, **as the `openclaw` user**:
 
 ```bash
+tailscale up --ssh                       # join tailnet (--ssh = you can drop port 22 later)
 cp .env.example .env
-openssl rand -hex 32        # paste into OPENCLAW_GATEWAY_TOKEN
-nano .env                   # set ANTHROPIC_API_KEY + the token
+openssl rand -hex 32                      # paste into OPENCLAW_GATEWAY_TOKEN
+nano .env                                 # set ANTHROPIC_API_KEY, token, HEALTHCHECKS_URL
+sudo cp .env /opt/openclaw/.env           # heartbeat timer reads it from here
+docker compose up -d openclaw-gateway watchtower
+curl -fsS http://127.0.0.1:18789/readyz   # expect 200
 ```
 
-### 4. Launch
+Open the Control UI at `http://<host-tailscale-name>:18789/` over Tailscale.
+No tailnet? Tunnel instead: `ssh -L 18789:127.0.0.1:18789 openclaw@<server-ip>`.
 
-```bash
-docker compose up -d openclaw-gateway
-docker compose logs -f openclaw-gateway      # watch it come up
-curl -fsS http://127.0.0.1:18789/readyz      # expect a 200
-```
-
-### 5. Reach the Control UI
-
-Over Tailscale, browse to `http://<host-tailscale-name>:18789/`. No tailnet yet?
-Tunnel over SSH instead:
-
-```bash
-ssh -L 18789:127.0.0.1:18789 openclaw@<server-ip>
-# then open http://127.0.0.1:18789/ in your local browser
-```
-
-### 6. First channel (optional, recommended for testing)
-
-Telegram is the lowest-friction first channel — create a bot with @BotFather and:
-
+### 5. (Optional) First channel — Telegram is easiest
+Create a bot with @BotFather, then:
 ```bash
 docker compose run --rm openclaw-cli channels add --channel telegram --token "<bot-token>"
 ```
 
-Message the bot; you should get a reply from your assistant.
+---
 
-### 7. Backups
+## What runs itself (no babysitting)
 
-Nightly tar of the state dir to object storage (or enable Hetzner snapshots):
+| Chore | How it's handled |
+|---|---|
+| **OS security patches** | `unattended-upgrades`, auto-applied |
+| **Kernel-update reboots** | Automatic, nightly at 04:00 |
+| **OpenClaw image updates** | **Watchtower**, weekly, prunes old images |
+| **Crash recovery** | `restart: unless-stopped` + healthcheck; Docker `live-restore` |
+| **Disk from logs** | Docker logs capped at 10 MB × 3 per container |
+| **Backups (local)** | Nightly tar of state → `/opt/openclaw/backups`, keeps 7 |
+| **Backups (offsite)** | Hetzner Backups checkbox (step 1) — survives host loss |
+| **Host-down alerting** | Heartbeat pings healthchecks.io every 5 min; silence → alert |
+| **Brute-force SSH** | `fail2ban` + key-only SSH + `ufw` deny-all-but-SSH |
 
-```bash
-tar czf /opt/openclaw/backup-$(date +%F).tgz \
-  /opt/openclaw/config /opt/openclaw/workspace /opt/openclaw/auth
-```
+Realistic ongoing touch: **near zero**. The one thing automation can't decide
+for you is whether to trust an auto-update — if you'd rather review releases,
+pin `OPENCLAW_IMAGE` to a date tag in `.env` and skip the `watchtower` service.
 
 ---
 
-## Adding WhatsApp later
-
-No infra changes — when Meta access and a spare number are ready:
+## Adding WhatsApp later (no infra change)
 
 ```bash
-docker compose run --rm openclaw-cli channels login   # scan the QR
-# then allowlist your number in the config:
-#   channels.whatsapp.allowFrom: ["+1XXXXXXXXXX"]
-docker compose up -d openclaw-gateway                 # reload
+docker compose run --rm openclaw-cli channels login   # scan the QR over SSH
+# then allowlist your number in the config: channels.whatsapp.allowFrom: ["+1XXXXXXXXXX"]
+docker compose up -d openclaw-gateway
 ```
-
-The WhatsApp Web session persists in the auth volume, so it survives restarts
-and image upgrades.
-
----
+The WhatsApp Web session persists in the auth volume and is included in backups.
 
 ## Wiring in your skills (later)
 
-OpenClaw consumes AgentSkills-compatible `SKILL.md` folders — the **same format
-the rest of this repo uses** (`london-art-show/`, `product-research/`). To make
-them available to the assistant, mount or copy them into the workspace skills
-dir, e.g.:
-
+OpenClaw uses the same `SKILL.md` format as the rest of this repo. Make them
+available to the assistant:
 ```bash
-git clone https://github.com/jalbertson-dev/ai-skills.git \
-  /opt/openclaw/workspace/skills
+git clone https://github.com/jalbertson-dev/ai-skills.git /opt/openclaw/workspace/skills
 ```
 
-Then reference them from the workspace config. (OpenClaw can also pull skills
-on demand from its ClawHub registry.)
+---
+
+## Verifying the automation is live
+
+```bash
+systemctl status unattended-upgrades                 # patching active
+systemctl list-timers | grep openclaw                # backup + heartbeat timers
+docker ps                                            # gateway + watchtower up
+cat /etc/docker/daemon.json                           # log rotation + live-restore
+sudo ufw status                                       # only SSH (+ 80/443 if Caddy)
+```
+
+## Security checklist
+
+- [ ] SSH key added at server creation → password auth disabled by `setup.sh`
+- [ ] Hetzner Backups enabled (offsite durability)
+- [ ] `HEALTHCHECKS_URL` set so you're alerted on host death
+- [ ] Control UI never published to `0.0.0.0`; reached via Tailscale
+- [ ] Strong `OPENCLAW_GATEWAY_TOKEN` (`openssl rand -hex 32`)
+- [ ] `.env` is `chmod 600` and git-ignored
+- [ ] (Optional) once on Tailscale, drop the public SSH port for an even smaller surface
 
 ---
 
@@ -144,19 +159,6 @@ on demand from its ClawHub registry.)
 
 | Swap | How |
 |---|---|
-| **Fly.io** instead of Hetzner | `fly launch` with a 2 GB machine + a volume mounted at `/home/node/.openclaw`; use `fly ssh console` for the WhatsApp QR step. |
-| **Railway/Render** | Deploy the image with a persistent volume; works, but the interactive pairing and always-on cost are less convenient. |
-| **Caddy public TLS** instead of Tailscale | Point DNS at the box, run `setup.sh` with `ENABLE_HTTP=yes`, and use the included `Caddyfile` (TLS + basic auth). |
-| **Official setup script** instead of this compose | On the box, run OpenClaw's `scripts/docker/setup.sh`, which auto-generates compose + onboarding. This file mirrors what it produces. |
-
----
-
-## Security checklist
-
-- [ ] Control UI (`18789`) never published to `0.0.0.0` without a proxy
-- [ ] `.env` is git-ignored and `chmod 600`
-- [ ] Strong `OPENCLAW_GATEWAY_TOKEN` (`openssl rand -hex 32`)
-- [ ] `OPENCLAW_SANDBOX=1` so the agent runs sandboxed
-- [ ] Firewall denies all inbound except SSH (+ 80/443 only if using Caddy)
-- [ ] SSH is key-only; consider moving it behind Tailscale too
-- [ ] Backups verified to restore
+| **Public HTTPS** instead of Tailscale | Run `setup.sh` with `ENABLE_HTTP=yes`, point DNS at the box, use the included `Caddyfile` (TLS + basic auth). |
+| **Manual updates** instead of Watchtower | Pin `OPENCLAW_IMAGE` to a date tag; don't start the `watchtower` service. |
+| **Official setup script** | OpenClaw's own `scripts/docker/setup.sh` auto-generates compose + onboarding; this compose mirrors it. |
