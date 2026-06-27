@@ -143,8 +143,25 @@ cat /etc/docker/daemon.json                           # log rotation + live-rest
 sudo ufw status                                       # only SSH (+ 80/443 if Caddy)
 ```
 
-## Security checklist
+## Security
 
+OpenClaw is an agent with shell/file/account access and **unsafe defaults**, and
+prompt injection can't be fully solved — read **[SECURITY.md](./SECURITY.md)**
+before connecting Gmail, Calendar, or messaging. It covers the threat model (the
+"lethal trifecta"), a Tier 1/2/3 ranking of defenses, a hardening checklist, and
+the egress-allowlist control.
+
+**Enable egress allowlisting** (default-deny outbound proxy) by layering the overlay:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.egress.yml up -d
+```
+
+Apply the locked-down settings from `openclaw.hardened.example.jsonc` (sandbox on,
+shell behind approval, tools/skills allowlisted, channels locked to you,
+connectors least-privilege).
+
+### Host checklist
 - [ ] SSH key added at server creation → password auth disabled by `setup.sh`
 - [ ] Hetzner Backups enabled (offsite durability)
 - [ ] `HEALTHCHECKS_URL` set so you're alerted on host death
@@ -152,6 +169,13 @@ sudo ufw status                                       # only SSH (+ 80/443 if Ca
 - [ ] Strong `OPENCLAW_GATEWAY_TOKEN` (`openssl rand -hex 32`)
 - [ ] `.env` is `chmod 600` and git-ignored
 - [ ] (Optional) once on Tailscale, drop the public SSH port for an even smaller surface
+
+### Agent checklist (see SECURITY.md)
+- [ ] `OPENCLAW_SANDBOX=1`, shell behind approval, tools allowlisted
+- [ ] Skill auto-install OFF; only vetted/own skills
+- [ ] Egress proxy enabled; logs reviewed
+- [ ] Connectors least-privilege (Gmail read/draft only, never send)
+- [ ] `channels.*.allowFrom` locked to your own number(s)
 
 ---
 

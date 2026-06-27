@@ -1,0 +1,63 @@
+// Hardened OpenClaw config — ILLUSTRATIVE TEMPLATE, not drop-in.
+//
+// OpenClaw's config keys/format change across versions. Treat this as the
+// *intent* of a locked-down config and reconcile each key against your version's
+// reference before applying:
+//     docker compose run --rm openclaw-cli config --help
+//     docker compose run --rm openclaw-cli doctor
+// Apply the equivalent settings via the Control UI or your real config file.
+//
+// Goal: enforce the Tier-1 controls from SECURITY.md — sandbox on, shell behind
+// approval, tools/skills allowlisted, channels locked to you, connectors least-
+// privilege. Defaults are the opposite of this, so these must be set explicitly.
+{
+  "model": {
+    // Use a current Claude model; matches OPENCLAW_MODEL_PRIMARY in .env.
+    "primary": "anthropic/claude-opus-4-8"
+  },
+
+  "sandbox": {
+    // Run the agent sandboxed. Mirrors OPENCLAW_SANDBOX=1.
+    "enabled": true
+  },
+
+  "exec": {
+    // Never auto-run shell. Require explicit human approval for any command.
+    "approvals": "always",
+    "autoApprove": false
+  },
+
+  "tools": {
+    // Allowlist, not denylist: grant only what your skills actually need.
+    // Start minimal and add as required.
+    "allow": ["calendar.read", "calendar.write", "mail.read"],
+    "deny": ["mail.send", "shell.*"]
+  },
+
+  "skills": {
+    // The single most important supply-chain setting: do NOT auto-install from
+    // ClawHub. Install only skills whose source you've personally reviewed.
+    "autoInstall": false,
+    "registry": { "autoSearch": false },
+    // Optional: pin to skills you trust (e.g. your own from this repo).
+    "allow": ["product-research", "london-art-show"]
+  },
+
+  "channels": {
+    "telegram": {
+      // Lock to your own chat/user id(s); reject everyone else.
+      "allowFrom": ["<your-telegram-user-id>"]
+    },
+    "whatsapp": {
+      // Uncomment when you pair WhatsApp; allowlist only your number.
+      // "allowFrom": ["+1XXXXXXXXXX"]
+    }
+  },
+
+  "connectors": {
+    // Least privilege: read + draft mail, never send. Calendar write is fine
+    // because it's gated by exec/approvals + your own review.
+    "gmail": { "scopes": ["read", "draft"], "send": false },
+    "googleCalendar": { "scopes": ["read", "write"] }
+  }
+}

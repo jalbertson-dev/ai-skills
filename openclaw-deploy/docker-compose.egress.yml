@@ -1,0 +1,36 @@
+# Optional egress-hardening overlay (Tier-1 control — see SECURITY.md).
+#
+# Adds a default-deny filtering proxy and forces the gateway's outbound HTTP/S
+# through it, so a prompt-injected agent can only reach allowlisted domains and
+# every attempt is logged. Layer it on top of the base compose:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.egress.yml up -d
+#
+# After enabling, confirm your channels still connect; if one fails, find the
+# blocked domain in the proxy logs and add it to egress/squid.conf:
+#   docker compose logs openclaw-egress-proxy
+#
+# NOTE: this filters traffic that honors HTTP(S)_PROXY (OpenClaw/Node does). It's
+# a strong application-level control, not an airtight network jail — which is why
+# the sandbox + tool allowlist must also be on. See SECURITY.md "Egress hardening".
+
+services:
+  egress-proxy:
+    image: ubuntu/squid:latest
+    container_name: openclaw-egress-proxy
+    restart: unless-stopped
+    volumes:
+      - ./egress/squid.conf:/etc/squid/squid.conf:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  openclaw-gateway:
+    depends_on:
+      - egress-proxy
+    environment:
+      HTTP_PROXY: http://egress-proxy:3128
+      HTTPS_PROXY: http://egress-proxy:3128
+      NO_PROXY: localhost,127.0.0.1,::1,egress-proxy
