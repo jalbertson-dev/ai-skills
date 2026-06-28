@@ -59,6 +59,11 @@ PermitRootLogin no
 PasswordAuthentication no
 PubkeyAuthentication yes
 KbdInteractiveAuthentication no
+# Allow local forwards only (needed for the SSH-tunnel UI access pattern);
+# block remote forwarding abuse. Per the official OpenClaw Hetzner guide.
+AllowTcpForwarding local
+AllowAgentForwarding no
+X11Forwarding no
 EOF
   systemctl restart ssh || systemctl restart sshd || true
 else
@@ -128,9 +133,14 @@ if ! command -v tailscale &>/dev/null; then
 fi
 
 log "Creating directories + installing maintenance scripts"
+# Host-side dirs (used by root systemd timers / scripts).
 install -d -o "$NEW_USER" -g "$NEW_USER" \
-  /opt/openclaw /opt/openclaw/config /opt/openclaw/workspace \
-  /opt/openclaw/auth /opt/openclaw/backups /opt/openclaw/bin
+  /opt/openclaw /opt/openclaw/backups /opt/openclaw/bin
+# Bind-mounted state dirs: the container runs as uid 1000 (node), so these MUST
+# be owned by 1000:1000 or the agent can't write to them. Per the official
+# OpenClaw Hetzner guide (chown -R 1000:1000).
+install -d -o 1000 -g 1000 \
+  /opt/openclaw/config /opt/openclaw/workspace /opt/openclaw/auth
 for f in heartbeat.sh backup.sh; do
   if [[ -f "$SCRIPT_DIR/scripts/$f" ]]; then
     install -m 755 "$SCRIPT_DIR/scripts/$f" "/opt/openclaw/bin/$f"
