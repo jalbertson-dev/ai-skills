@@ -1,0 +1,29 @@
+name: skills-ci
+
+# Pre-merge gate for Agent Skills. Runs on every PR so a broken, oversized, or
+# risky SKILL.md cannot be merged (and therefore cannot be pulled to the live
+# OpenClaw agent). See skills-ci/README.md for what this does and does not cover.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: pip install pyyaml
+
+      - name: Validate SKILL.md files
+        run: python3 skills-ci/validate.py .
+
+      - name: Build all skills (.skill bundles)
+        run: make
