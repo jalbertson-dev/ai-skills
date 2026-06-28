@@ -1,0 +1,29 @@
+# OPTIONAL: only use this if you chose the "public HTTPS" path instead of
+# Tailscale/SSH-tunnel. It exposes the Control UI on a real domain with
+# automatic TLS and HTTP basic auth.
+#
+# Prereqs:
+#   - A DNS A record (e.g. openclaw.example.com) pointing at the VPS.
+#   - setup.sh run with ENABLE_HTTP=yes (opens 80/443).
+#   - Run Caddy alongside the gateway and generate a password hash with:
+#       docker run --rm caddy caddy hash-password --plaintext 'your-strong-password'
+#
+# Replace the placeholders below, then run Caddy (e.g. the official caddy image
+# with this file mounted at /etc/caddy/Caddyfile).
+
+openclaw.example.com {
+	encode zstd gzip
+
+	basic_auth {
+		# username  <bcrypt-hash-from-caddy-hash-password>
+		admin $2a$14$REPLACE_WITH_HASHED_PASSWORD
+	}
+
+	reverse_proxy 127.0.0.1:18789
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+	}
+}

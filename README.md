@@ -8,6 +8,12 @@ A collection of Agent Skills for Claude and compatible AI tools, using the open 
 |-------|-------------|
 | [product-research](./product-research) | Find the best products by analysing independent editorial reviews |
 
+## Deployment
+
+| Guide | Description |
+|-------|-------------|
+| [openclaw-deploy](./openclaw-deploy) | Stand up a self-hosted [OpenClaw](https://github.com/openclaw/openclaw) personal AI assistant in the cloud (Docker Compose on a VPS), ready to load these skills |
+
 ## Installation
 
 ### Claude.ai
