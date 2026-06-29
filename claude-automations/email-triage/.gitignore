@@ -1,0 +1,6 @@
+# Never commit secrets, runtime config, or logs
+.env
+mcp.gmail.json
+secrets/
+log/
+*.local

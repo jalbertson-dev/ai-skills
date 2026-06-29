@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Claude email triage a few times a day
+
+[Timer]
+# Morning, midday, evening. Adjust to taste (e.g. hourly: OnCalendar=*-*-* *:07).
+OnCalendar=*-*-* 08,13,18:07
+Persistent=true
+
+[Install]
+WantedBy=timers.target
