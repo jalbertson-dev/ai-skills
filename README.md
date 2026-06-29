@@ -7,6 +7,7 @@ A collection of Agent Skills for Claude and compatible AI tools, using the open 
 | Skill | Description |
 |-------|-------------|
 | [product-research](./product-research) | Find the best products by analysing independent editorial reviews |
+| [gmail-triage](./gmail-triage) | Unattended Gmail inbox triage — classify mail and route to Calendar, Drive logs, a read-later app, or a todo app |
 
 ## Deployment
 
