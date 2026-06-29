@@ -110,6 +110,39 @@ git clone https://github.com/YOUR_USERNAME/ai-skills.git ~/.claude/skills
 - Scheduling granularity and run cost are bound by your Claude Code on the
   web plan.
 
+## Accuracy: aliases, learned senders, and priority
+
+Three signals make classification fast and reliable, in order of strength:
+
+1. **Alias-aware routing** — if you control the address you hand out, use
+   plus-aliases (`you+receipts@`, `you+news@`) and map them in CONFIG's
+   `aliases`. A match is near-certain and skips reading the body entirely.
+2. **Learned sender map** — the one-time **First-run personalization** step
+   (see [`SKILL.md`](./SKILL.md)) scans your high-volume senders (and
+   optionally your *sent* mail) and proposes a `sender_map` so common
+   senders are pinned to a category.
+3. **Priority overlay** — independent of category, time-sensitive items
+   (deadlines, payments, direct questions, same-day events) also get a
+   `triaged/urgent` label so they're easy to surface in any bucket.
+
+## Prior art / credits
+
+This skill targets a **multi-destination router** (each category → a
+different place: calendar, Drive log, read-later, todo), which the existing
+published triage tools don't do — they mostly tier by priority and draft
+replies. Patterns here are borrowed gratefully from them:
+
+- **[Harper Reed — office-admin-claude](https://harper.blog/2025/12/03/claude-code-email-productivity-mcp-agents/)**
+  — the "always draft, never send" rule and learning your style/categories
+  from past mail (the personalization step).
+- **[ericporres/email-triage-plugin](https://github.com/ericporres/email-triage-plugin)** (MIT)
+  — alias-aware routing, the priority-tier overlay, and archive-not-delete.
+- **[AgriciDaniel/claude-email](https://github.com/AgriciDaniel/claude-email)** (MIT)
+  — broader email-management skill (triage + composition + deliverability).
+
+If you'd rather a reply-drafting assistant than a destination router, those
+projects are the better starting point.
+
 ## Contributing
 
 Useful additions: more read-later / todo providers, a Google Sheets

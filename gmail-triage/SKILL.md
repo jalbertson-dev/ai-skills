@@ -51,6 +51,29 @@ destinations:
   news:         off                # newsletters / articles -> read-later (see HOOKS)
   action:       off                # things needing a reply or task (see HOOKS)
 
+# --- Alias-aware routing (strong classification hints) ---
+# Map plus-aliases / delivered-to addresses to a category. A match here is
+# a high-confidence signal and overrides body-based guessing. Cheap and
+# reliable — set these up at the source and triage gets near-perfect.
+aliases:
+  # "you+receipts@gmail.com": receipts
+  # "you+news@gmail.com":     news
+  # "you+health@gmail.com":   health
+
+# --- Sender -> category map (learned, see "First-run personalization") ---
+# Exact senders or domains the personalization step (or you) have pinned.
+sender_map:
+  # "noreply@amazon.co.uk":   receipts
+  # "@substack.com":          news
+
+# --- Priority overlay (on top of category) ---
+# Flags time-sensitive items without changing where they're routed.
+priority:
+  enabled: true
+  urgent_label: "triaged/urgent"   # also applied when an item looks urgent
+  # Signals: deadlines/"by <date>", "urgent"/"action required", direct
+  # questions to you, payment due, same/next-day events.
+
 # --- Google Calendar ---
 calendar_id: "primary"
 default_event_duration_minutes: 60
@@ -74,12 +97,36 @@ category_labels:
 
 ---
 
+## First-run personalization (one-time, optional but recommended)
+
+Generic classification is decent; classification tuned to *this* inbox is
+much better. Run this once (or whenever accuracy drifts) to populate
+`sender_map` in CONFIG, then commit the updated skill.
+
+1. Search the user's mail for high-volume senders across a wide window
+   (e.g. `newer_than:1y`), grouped by `from:`.
+2. For the top ~30 senders, infer the obvious category (Amazon/Apple →
+   receipts; Substack/newsletters → news; clinics/pharmacies → health;
+   airlines/restaurants/ticketing → calendar).
+3. Optionally sample the user's **sent** mail (`in:sent`) to learn whom
+   they actually reply to — those senders bias toward `action`.
+4. Propose the resulting `sender_map` / `aliases` additions to the user
+   (or, if unattended, write them and note it in the summary). Pinned
+   senders are checked before any body-based guessing, which makes runs
+   faster, cheaper, and more consistent.
+
+This is the single biggest accuracy upgrade. Aliases (set up at the
+source, e.g. `you+receipts@`) are even stronger — prefer them where the
+user controls the address they hand out.
+
+---
+
 ## Operating procedure
 
 ### Step 0 — Setup (once per run)
 1. Read CONFIG.
-2. List existing Gmail labels. Create any label in `triaged_label` /
-   `category_labels` that does not exist yet.
+2. List existing Gmail labels. Create any label in `triaged_label`,
+   `category_labels`, and `priority.urgent_label` that does not exist yet.
 3. Build the working query: `"{inbox_query} {skip_query}"`.
 
 ### Step 1 — Fetch the work queue
@@ -88,10 +135,19 @@ Search threads with the working query. Cap the result at
 them up. Process oldest first so nothing starves.
 
 ### Step 2 — Classify each thread
-Read enough of the thread to classify it (subject + first message is
-usually enough; open the full thread only when ambiguous). Assign **exactly
-one** primary category, in this priority order when a message could fit
-more than one:
+Classify in this order, stopping at the first confident match — cheaper and
+more consistent than reading every body:
+
+1. **Alias match** — if the delivered-to / `to:` address matches an entry
+   in `aliases`, use that category. Highest confidence.
+2. **Sender match** — if `from:` matches an entry in `sender_map` (exact
+   address or `@domain`), use that category.
+3. **Content classification** — otherwise read enough of the thread
+   (subject + first message is usually enough; open the full thread only
+   when ambiguous) and apply the rules below.
+
+Assign **exactly one** primary category, in this priority order when a
+message could fit more than one:
 
 1. **calendar** — contains a specific date/time the user should be at, or
    a booking/ticket/reservation/appointment confirmation with a when.
@@ -112,6 +168,13 @@ more than one:
 If genuinely uncertain between two categories, prefer the **higher-impact**
 one (calendar/health/action over news/none) so nothing important is lost.
 
+**Priority overlay (independent of category):** if `priority.enabled`,
+assess whether the thread is time-sensitive — a deadline or "by <date>", an
+explicit "urgent"/"action required", a direct question awaiting the user, a
+payment due, or a same/next-day event. This does **not** change the
+category or where it routes; it only adds the `urgent_label` in Step 4 so
+urgent items (in any category) are easy to surface.
+
 ### Step 3 — Route to destination
 For each thread, perform the destination action(s) for its category using
 the matching destination from CONFIG. See **Destinations** below. If a
@@ -120,7 +183,8 @@ category's destination is `off`, do not act — just label it.
 ### Step 4 — Mark done (idempotency — never skip this)
 After successfully routing a thread:
 1. Apply the category label (`category_labels.<category>`).
-2. Apply the parent `triaged_label`.
+2. If the priority overlay flagged it urgent, also apply `priority.urgent_label`.
+3. Apply the parent `triaged_label`.
 
 Applying the parent label is what removes the thread from the next run's
 queue (because of `skip_query`). **Only apply `triaged` after the
