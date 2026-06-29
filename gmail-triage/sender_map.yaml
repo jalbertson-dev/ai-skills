@@ -1,0 +1,20 @@
+# Learned sender -> category routing for the gmail-triage skill.
+#
+# Maintained by the skill's First-run personalization step, and editable by
+# hand. The triage routine reads this file at the start of every run and
+# consults it (after aliases, before body-based classification). When it
+# learns new high-confidence senders it appends them here and commits the
+# change, so the map persists across stateless scheduled runs.
+#
+# Keys:   an exact email address ("noreply@amazon.co.uk")
+#         or a domain prefixed with "@" ("@substack.com").
+# Values: one of  calendar | receipts | health | news | action | none
+#
+# NOTE: This is repo-local state, NOT part of the distributed .skill bundle
+# (the build only packages SKILL.md). A fresh install starts with an empty
+# map and learns from scratch.
+
+senders:
+  # "noreply@amazon.co.uk": receipts
+  # "@substack.com":        news
+  # "appointments@myclinic.com": health
