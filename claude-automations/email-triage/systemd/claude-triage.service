@@ -1,0 +1,15 @@
+[Unit]
+Description=Claude Code email inbox triage
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=openclaw
+EnvironmentFile=/opt/claude-automations/email-triage/.env
+ExecStart=/opt/claude-automations/email-triage/triage.sh
+# Harden the unit a little (it only needs its own dir + network).
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/claude-automations/email-triage
+PrivateTmp=true

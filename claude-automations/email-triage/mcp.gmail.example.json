@@ -1,0 +1,14 @@
+{
+  "// NOTE": "Template — copy to mcp.gmail.json and fill in. Pick a vetted Gmail MCP server (read the source first) and grant LEAST-PRIVILEGE scopes: read + modify labels ONLY. Do NOT grant gmail.send or full mail.google.com. With read/label-only scopes the server should expose only a few tools, none of which can send or delete.",
+  "mcpServers": {
+    "gmail": {
+      "command": "npx",
+      "args": ["-y", "<vetted-gmail-mcp-server-package>"],
+      "env": {
+        "GMAIL_CREDENTIALS_PATH": "/opt/claude-automations/email-triage/secrets/gmail-oauth.json",
+        "GMAIL_TOKEN_PATH": "/opt/claude-automations/email-triage/secrets/gmail-token.json",
+        "GMAIL_SCOPES": "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.labels"
+      }
+    }
+  }
+}
