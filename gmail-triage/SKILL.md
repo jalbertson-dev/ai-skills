@@ -61,10 +61,10 @@ aliases:
   # "you+health@gmail.com":   health
 
 # --- Sender -> category map (learned, see "First-run personalization") ---
-# Exact senders or domains the personalization step (or you) have pinned.
-sender_map:
-  # "noreply@amazon.co.uk":   receipts
-  # "@substack.com":          news
+# Stored in a separate repo-local data file, not inline here, so learned
+# data stays out of the instructions and updates are clean diffs. The file
+# lives alongside this skill. See its header for the format.
+sender_map_file: "sender_map.yaml"
 
 # --- Priority overlay (on top of category) ---
 # Flags time-sensitive items without changing where they're routed.
@@ -100,8 +100,8 @@ category_labels:
 ## First-run personalization (one-time, optional but recommended)
 
 Generic classification is decent; classification tuned to *this* inbox is
-much better. Run this once (or whenever accuracy drifts) to populate
-`sender_map` in CONFIG, then commit the updated skill.
+much better. Run this once (or whenever accuracy drifts) to populate the
+`sender_map_file` (`sender_map.yaml`), then commit it.
 
 1. Search the user's mail for high-volume senders across a wide window
    (e.g. `newer_than:1y`), grouped by `from:`.
@@ -110,10 +110,26 @@ much better. Run this once (or whenever accuracy drifts) to populate
    airlines/restaurants/ticketing → calendar).
 3. Optionally sample the user's **sent** mail (`in:sent`) to learn whom
    they actually reply to — those senders bias toward `action`.
-4. Propose the resulting `sender_map` / `aliases` additions to the user
-   (or, if unattended, write them and note it in the summary). Pinned
-   senders are checked before any body-based guessing, which makes runs
-   faster, cheaper, and more consistent.
+4. Write the new entries into `sender_map.yaml` under `senders:` (keep
+   existing entries; add, don't replace) and **persist them**:
+   ```
+   git add gmail-triage/sender_map.yaml
+   git commit -m "gmail-triage: learn N senders"
+   git push
+   ```
+   This is what makes the learning survive — each scheduled run is a fresh
+   clone, so an un-committed change is lost. If the run lacks push access,
+   instead surface the proposed additions in the summary for the user to
+   commit. Pinned senders are checked before any body-based guessing, which
+   makes runs faster, cheaper, and more consistent.
+
+> **Persistence model:** the sender map lives in the repo, so the repo is
+> the source of truth. The *first-run personalization* commits a batch.
+> Steady-state triage runs should **not** commit on every tick — only pin a
+> sender when it's clearly high-confidence and high-volume, and batch such
+> updates (e.g. at most once per run) to avoid noisy history. Aliases and
+> other CONFIG settings stay in `SKILL.md`; only the learned sender map
+> lives in the data file.
 
 This is the single biggest accuracy upgrade. Aliases (set up at the
 source, e.g. `you+receipts@`) are even stronger — prefer them where the
@@ -125,9 +141,13 @@ user controls the address they hand out.
 
 ### Step 0 — Setup (once per run)
 1. Read CONFIG.
-2. List existing Gmail labels. Create any label in `triaged_label`,
+2. Load the sender map from `sender_map_file` (relative to this skill's
+   directory). If the file is missing or its `senders` mapping is empty,
+   proceed with an empty map — classification still works, just without the
+   pinned-sender shortcut. Hold the parsed map in memory for Step 2.
+3. List existing Gmail labels. Create any label in `triaged_label`,
    `category_labels`, and `priority.urgent_label` that does not exist yet.
-3. Build the working query: `"{inbox_query} {skip_query}"`.
+4. Build the working query: `"{inbox_query} {skip_query}"`.
 
 ### Step 1 — Fetch the work queue
 Search threads with the working query. Cap the result at
@@ -140,8 +160,8 @@ more consistent than reading every body:
 
 1. **Alias match** — if the delivered-to / `to:` address matches an entry
    in `aliases`, use that category. Highest confidence.
-2. **Sender match** — if `from:` matches an entry in `sender_map` (exact
-   address or `@domain`), use that category.
+2. **Sender match** — if `from:` matches an entry in the sender map loaded
+   in Step 0 (exact address or `@domain`), use that category.
 3. **Content classification** — otherwise read enough of the thread
    (subject + first message is usually enough; open the full thread only
    when ambiguous) and apply the rules below.

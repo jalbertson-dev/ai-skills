@@ -119,11 +119,41 @@ Three signals make classification fast and reliable, in order of strength:
    `aliases`. A match is near-certain and skips reading the body entirely.
 2. **Learned sender map** — the one-time **First-run personalization** step
    (see [`SKILL.md`](./SKILL.md)) scans your high-volume senders (and
-   optionally your *sent* mail) and proposes a `sender_map` so common
-   senders are pinned to a category.
+   optionally your *sent* mail) and pins common senders to a category in
+   [`sender_map.yaml`](./sender_map.yaml). See **Where the sender map lives**
+   below.
 3. **Priority overlay** — independent of category, time-sensitive items
    (deadlines, payments, direct questions, same-day events) also get a
    `triaged/urgent` label so they're easy to surface in any bucket.
+
+## Where the sender map lives
+
+The learned sender→category map is kept in
+[`sender_map.yaml`](./sender_map.yaml), separate from the skill
+instructions, and the **repo is the source of truth**:
+
+- **Read:** every run loads it at startup (Step 0) and consults it before
+  body-based classification. Each scheduled run is a fresh, stateless clone,
+  so whatever is committed is what the next run sees.
+- **Update:** the first-run personalization step writes new entries and
+  commits + pushes them (`git commit gmail-triage/sender_map.yaml`). Without
+  that commit the learning is lost on the next clone. If a run can't push,
+  it surfaces the proposed additions for you to commit by hand — the file is
+  plain YAML, so editing it directly is fine too.
+- **Steady state:** routine ticks shouldn't commit on every run; pin a
+  sender only when it's clearly high-confidence and batch updates to keep
+  git history clean.
+
+Only the *learned* data lives in the file. Static settings (labels,
+calendar ID, aliases, destinations) stay in the CONFIG block of
+[`SKILL.md`](./SKILL.md). The data file is **repo-local state and is not
+packaged into the distributed `.skill`** — a fresh install starts with an
+empty map and learns from scratch.
+
+> Note: persisting via git requires the run's environment to have push
+> access to the repo. In a no-git host, treat the map as human-curated
+> (edit `sender_map.yaml` and commit yourself), or switch to the Drive-file
+> variant (Option C) which self-updates without git.
 
 ## Prior art / credits
 
